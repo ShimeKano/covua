@@ -11,21 +11,21 @@ import gradio as gr
 
 # ── Unicode chess pieces ───────────────────────────────────────────────────────
 PIECES: dict[tuple[int, bool], str] = {
-    (chess.KING,   chess.WHITE): "♔",
-    (chess.QUEEN,  chess.WHITE): "♕",
-    (chess.ROOK,   chess.WHITE): "♖",
+    (chess.KING, chess.WHITE): "♔",
+    (chess.QUEEN, chess.WHITE): "♕",
+    (chess.ROOK, chess.WHITE): "♖",
     (chess.BISHOP, chess.WHITE): "♗",
     (chess.KNIGHT, chess.WHITE): "♘",
-    (chess.PAWN,   chess.WHITE): "♙",
-    (chess.KING,   chess.BLACK): "♚",
-    (chess.QUEEN,  chess.BLACK): "♛",
-    (chess.ROOK,   chess.BLACK): "♜",
+    (chess.PAWN, chess.WHITE): "♙",
+    (chess.KING, chess.BLACK): "♚",
+    (chess.QUEEN, chess.BLACK): "♛",
+    (chess.ROOK, chess.BLACK): "♜",
     (chess.BISHOP, chess.BLACK): "♝",
     (chess.KNIGHT, chess.BLACK): "♞",
-    (chess.PAWN,   chess.BLACK): "♟",
+    (chess.PAWN, chess.BLACK): "♟",
 }
 
-# ── Stockfish helper ───────────────────────────────────────────────────────────
+# ── Stockfish helper ──────────────────────────────────────────────────────────
 _SF_CANDIDATES = [
     "/usr/games/stockfish",
     "/usr/bin/stockfish",
@@ -51,9 +51,8 @@ def _engine_move(board: chess.Board) -> chess.Move | None:
         return legal[0] if legal else None
 
 
-# ── Board HTML renderer ────────────────────────────────────────────────────────
+# ── Board HTML renderer ───────────────────────────────────────────────────────
 _CSS = """
-<style>
 #chess-app{font-family:Arial,sans-serif;display:flex;flex-direction:column;
   align-items:center;padding:12px;user-select:none}
 .st{font-size:20px;font-weight:700;margin:6px 0 10px;min-height:28px;
@@ -84,14 +83,11 @@ _CSS = """
   text-shadow:0 0 2px #000,0 0 4px #000,1px 1px 0 #444}
 .bp{font-size:48px;line-height:1;color:#111;
   text-shadow:0 0 1px #888,1px 1px 0 #eee}
-</style>
 """
 
 _JS = """
-<script>
 function sqClick(sq){
-  var ts = sq+'_'+Date.now();
-  // Try both textarea (Gradio 3) and input (Gradio 4)
+  var ts = sq + '_' + Date.now();
   var inp = document.querySelector('#sq-input textarea') ||
             document.querySelector('#sq-input input[type="text"]') ||
             document.querySelector('#sq-input input');
@@ -110,7 +106,7 @@ function sqClick(sq){
   inp.dispatchEvent(new InputEvent('input',{bubbles:true,cancelable:true}));
   inp.dispatchEvent(new Event('change',{bubbles:true}));
 }
-</script>
+window.sqClick = sqClick;
 """
 
 
@@ -153,7 +149,7 @@ def _make_board_html(
                 inner = f'<span class="{pc}">{sym}</span>'
 
             cells.append(
-                f'<div class="{" ".join(cls)}" onclick="sqClick({sq})">{inner}</div>'
+                f'<div class="{" ".join(cls)}" onclick="window.sqClick({sq})">{inner}</div>'
             )
 
     rank_labels = "".join(
@@ -165,7 +161,6 @@ def _make_board_html(
 
     board_grid = "".join(cells)
     return (
-        f"{_CSS}"
         f'<div id="chess-app">'
         f'  <div class="st">{status}</div>'
         f'  <div class="bw">'
@@ -176,11 +171,10 @@ def _make_board_html(
         f'    </div>'
         f'  </div>'
         f"</div>"
-        f"{_JS}"
     )
 
 
-# ── Default state ──────────────────────────────────────────────────────────────
+# ── Default state ─────────────────────────────────────────────────────────────
 def _default_state() -> dict:
     return {
         "fen": chess.STARTING_FEN,
@@ -193,7 +187,7 @@ def _default_state() -> dict:
     }
 
 
-# ── Event handlers ─────────────────────────────────────────────────────────────
+# ── Event handlers ────────────────────────────────────────────────────────────
 def start_game(color_choice: str, _state: dict) -> tuple[str, dict]:
     """Reset board and optionally let engine play first."""
     human_white = color_choice.startswith("Trắng")
@@ -381,7 +375,7 @@ def undo_move(state: dict) -> tuple[str, dict]:
     return html, state
 
 
-# ── Gradio UI ──────────────────────────────────────────────────────────────────
+# ── Gradio UI ─────────────────────────────────────────────────────────────────
 _INITIAL_STATE = _default_state()
 _initial_board = _make_board_html(
     chess.Board(),
@@ -389,7 +383,7 @@ _initial_board = _make_board_html(
     status="Chọn màu quân rồi bấm '🎮 Ván mới' để bắt đầu!",
 )
 
-with gr.Blocks(title="Cờ Vua vs Stockfish", theme=gr.themes.Soft()) as demo:
+with gr.Blocks(title="Cờ Vua vs Stockfish", theme=gr.themes.Soft(), css=_CSS, js=_JS) as demo:
     gr.Markdown(
         "# ♟️ Cờ Vua – Chơi với Stockfish\n"
         "Click vào quân cờ để chọn, rồi click ô đến để di chuyển. "
@@ -408,7 +402,7 @@ with gr.Blocks(title="Cờ Vua vs Stockfish", theme=gr.themes.Soft()) as demo:
         new_game_btn = gr.Button("🎮 Ván mới", variant="primary", scale=1)
         undo_btn = gr.Button("⏪ Đi lại", scale=1)
 
-    board_html = gr.HTML(value=_initial_board)
+    board_html = gr.HTML(value=_initial_board, sanitize=False)
 
     # Hidden textbox – receives square index from JavaScript onclick handlers.
     # elem_id="sq-input" lets the JS in _JS locate it in the DOM.
