@@ -106,6 +106,21 @@ function sqClick(sq){
   inp.dispatchEvent(new InputEvent('input',{bubbles:true,cancelable:true}));
   inp.dispatchEvent(new Event('change',{bubbles:true}));
 }
+
+function findSquareId(el){
+  if(!el) return null;
+  if(el.dataset && el.dataset.sq) return el.dataset.sq;
+  if(el.id && el.id.startsWith('sq-')) return el.id.replace('sq-','');
+  return null;
+}
+
+document.addEventListener('click', (event) => {
+  const cell = event.target.closest('.sq');
+  if(!cell) return;
+  const sq = findSquareId(cell);
+  if(!sq) return;
+  sqClick(sq);
+});
 window.sqClick = sqClick;
 """
 
@@ -149,7 +164,7 @@ def _make_board_html(
                 inner = f'<span class="{pc}">{sym}</span>'
 
             cells.append(
-                f'<div class="{" ".join(cls)}" onclick="window.sqClick({sq})">{inner}</div>'
+                f'<div class="{" ".join(cls)}" data-sq="{sq}" id="sq-{sq}">{inner}</div>'
             )
 
     rank_labels = "".join(
@@ -174,7 +189,7 @@ def _make_board_html(
     )
 
 
-# ── Default state ─────────────────────────────────────────────────────────────
+# ── Default state ──────��──────────────────────────────────────────────────────
 def _default_state() -> dict:
     return {
         "fen": chess.STARTING_FEN,
