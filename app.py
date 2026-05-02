@@ -5,9 +5,12 @@ Nếu chơi quân đen, bàn cờ sẽ được xoay ngược.
 """
 
 import os
+from typing import Tuple
+
 import chess
 import chess.engine
 import gradio as gr
+from PIL import Image, ImageDraw, ImageFont
 
 # ── Unicode chess pieces ───────────────────────────────────────────────────────
 PIECES: dict[tuple[int, bool], str] = {
@@ -51,159 +54,112 @@ def _engine_move(board: chess.Board) -> chess.Move | None:
         return legal[0] if legal else None
 
 
-# ── Board HTML renderer ───────────────────────────────────────────────────────
-_CSS = """
-#chess-app{font-family:Arial,sans-serif;display:flex;flex-direction:column;
-  align-items:center;padding:12px;user-select:none}
-.st{font-size:20px;font-weight:700;margin:6px 0 10px;min-height:28px;
-  text-align:center;color:#222}
-.bw{display:flex;align-items:flex-start}
-.rls{display:flex;flex-direction:column;margin-right:4px}
-.rl{width:22px;height:68px;display:flex;align-items:center;
-  justify-content:center;font-size:13px;color:#666}
-.fl{width:68px;height:22px;display:flex;align-items:center;
-  justify-content:center;font-size:13px;color:#666}
-.fls{display:flex;margin-top:2px;margin-left:26px}
-.board{display:grid;grid-template-columns:repeat(8,68px);
-  grid-template-rows:repeat(8,68px);
-  border:3px solid #444;box-shadow:4px 6px 18px rgba(0,0,0,.45)}
-.sq{width:68px;height:68px;display:flex;align-items:center;
-  justify-content:center;cursor:pointer;position:relative;
-  transition:filter .08s}
-.sq:hover{filter:brightness(.88)}
-.lt{background:#f0d9b5}.dk{background:#b58863}
-.sel{background:#7fc97f!important}
-.mv::after{content:'';position:absolute;width:24px;height:24px;
-  background:rgba(0,0,0,.22);border-radius:50%;pointer-events:none;z-index:2}
-.cap::after{content:'';position:absolute;width:62px;height:62px;
-  background:transparent;border:5px solid rgba(0,0,0,.22);
-  border-radius:50%;pointer-events:none;z-index:2}
-.last{background:#cdd26a!important}
-.wp{font-size:48px;line-height:1;color:#fff;
-  text-shadow:0 0 2px #000,0 0 4px #000,1px 1px 0 #444}
-.bp{font-size:48px;line-height:1;color:#111;
-  text-shadow:0 0 1px #888,1px 1px 0 #eee}
-"""
-
-_JS = """
-function gradioRoot(){
-  const app = document.querySelector('gradio-app');
-  if(app && app.shadowRoot) return app.shadowRoot;
-  return document;
-}
-
-function findInput(){
-  const root = gradioRoot();
-  return root.querySelector('#sq-input textarea') ||
-         root.querySelector('#sq-input input[type="text"]') ||
-         root.querySelector('#sq-input input');
-}
-
-function sqClick(sq){
-  var ts = sq + '_' + Date.now();
-  var inp = findInput();
-  if(!inp) return;
-  try{
-    var proto = inp.tagName==='TEXTAREA'
-      ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
-    var setter = Object.getOwnPropertyDescriptor(proto,'value');
-    if(setter && setter.set) setter.set.call(inp, ts);
-    else inp.value=ts;
-  } catch(e){ inp.value=ts; }
-  inp.dispatchEvent(new InputEvent('input',{bubbles:true,cancelable:true}));
-  inp.dispatchEvent(new Event('change',{bubbles:true}));
-}
-
-function findSquareId(el){
-  if(!el) return null;
-  if(el.dataset && el.dataset.sq) return el.dataset.sq;
-  if(el.id && el.id.startsWith('sq-')) return el.id.replace('sq-','');
-  return null;
-}
-
-function attachBoardListener(){
-  const root = gradioRoot();
-  root.addEventListener('click', (event) => {
-    const cell = event.target.closest('.sq');
-    if(!cell) return;
-    const sq = findSquareId(cell);
-    if(!sq) return;
-    sqClick(sq);
-  });
-}
-
-if(document.readyState === 'loading'){
-  document.addEventListener('DOMContentLoaded', attachBoardListener);
-} else {
-  attachBoardListener();
-}
-
-window.sqClick = sqClick;
-"""
+# ── Board rendering ───────────────────────────────────────────────────────────
+_SQ_SIZE = 80
+_BOARD_SIZE = _SQ_SIZE * 8
+_LIGHT = (240, 217, 181)
+_DARK = (181, 136, 99)
+_SELECTED = (127, 201, 127)
+_LAST = (205, 210, 106)
 
 
-def _make_board_html(
+def _load_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
+    try:
+        return ImageFont.truetype("DejaVuSans.ttf", size)
+    except Exception:
+        return ImageFont.load_default()
+
+
+_FONT = _load_font(48)
+
+
+def _display_to_square(row: int, col: int, flipped: bool) -> int:
+    if flipped:
+        rank = row
+        file = 7 - col
+    else:
+        rank = 7 - row
+        file = col
+    return chess.square(file, rank)
+
+
+def _square_to_display(square: int, flipped: bool) -> Tuple[int, int]:
+    file = chess.square_file(square)
+    rank = chess.square_rank(square)
+    if flipped:
+        return rank, 7 - file
+    return 7 - rank, file
+
+
+def _render_board(
     board: chess.Board,
     selected: int | None = None,
     valid_targets: list[int] | None = None,
     flipped: bool = False,
-    status: str = "",
-) -> str:
+) -> Image.Image:
+    image = Image.new("RGB", (_BOARD_SIZE, _BOARD_SIZE), (255, 255, 255))
+    draw = ImageDraw.Draw(image)
     vt = set(valid_targets or [])
+
     last_sqs: set[int] = set()
     if board.move_stack:
         lm = board.peek()
         last_sqs = {lm.from_square, lm.to_square}
 
-    rows = range(7, -1, -1) if not flipped else range(8)
-    cols = range(8) if not flipped else range(7, -1, -1)
+    for row in range(8):
+        for col in range(8):
+            sq = _display_to_square(row, col, flipped)
+            x0 = col * _SQ_SIZE
+            y0 = row * _SQ_SIZE
+            x1 = x0 + _SQ_SIZE
+            y1 = y0 + _SQ_SIZE
 
-    cells: list[str] = []
-    for rank in rows:
-        for file in cols:
-            sq = chess.square(file, rank)
-            piece = board.piece_at(sq)
-
-            is_light = (rank + file) % 2 == 1
-            cls = ["sq", "lt" if is_light else "dk"]
-
+            is_light = (row + col) % 2 == 1
+            color = _LIGHT if is_light else _DARK
             if sq == selected:
-                cls.append("sel")
-            elif sq in vt:
-                cls.append("cap" if piece else "mv")
-            if sq in last_sqs and sq != selected:
-                cls.append("last")
+                color = _SELECTED
+            elif sq in last_sqs:
+                color = _LAST
+            draw.rectangle([x0, y0, x1, y1], fill=color)
 
-            inner = ""
+            if sq in vt:
+                if board.piece_at(sq):
+                    draw.ellipse(
+                        [x0 + 8, y0 + 8, x1 - 8, y1 - 8],
+                        outline=(0, 0, 0),
+                        width=4,
+                    )
+                else:
+                    draw.ellipse(
+                        [x0 + 28, y0 + 28, x1 - 28, y1 - 28],
+                        fill=(0, 0, 0, 80),
+                    )
+
+            piece = board.piece_at(sq)
             if piece:
-                sym = PIECES.get((piece.piece_type, piece.color), "?")
-                pc = "wp" if piece.color == chess.WHITE else "bp"
-                inner = f'<span class="{pc}">{sym}</span>'
+                symbol = PIECES.get((piece.piece_type, piece.color), "?")
+                fill = (250, 250, 250) if piece.color == chess.WHITE else (15, 15, 15)
+                draw.text(
+                    (x0 + _SQ_SIZE / 2, y0 + _SQ_SIZE / 2),
+                    symbol,
+                    fill=fill,
+                    font=_FONT,
+                    anchor="mm",
+                    stroke_width=2,
+                    stroke_fill=(20, 20, 20) if piece.color == chess.WHITE else (220, 220, 220),
+                )
 
-            cells.append(
-                f'<div class="{" ".join(cls)}" data-sq="{sq}" id="sq-{sq}">{inner}</div>'
-            )
+    return image
 
-    rank_labels = "".join(
-        f'<div class="rl">{r + 1}</div>'
-        for r in (range(7, -1, -1) if not flipped else range(8))
-    )
-    file_str = "abcdefgh" if not flipped else "hgfedcba"
-    file_labels = "".join(f'<div class="fl">{c}</div>' for c in file_str)
 
-    board_grid = "".join(cells)
-    return (
-        f'<div id="chess-app">'
-        f'  <div class="st">{status}</div>'
-        f'  <div class="bw">'
-        f'    <div class="rls">{rank_labels}</div>'
-        f'    <div>'
-        f'      <div class="board">{board_grid}</div>'
-        f'      <div class="fls">{file_labels}</div>'
-        f'    </div>'
-        f'  </div>'
-        f"</div>"
-    )
+def _pixel_to_square(x: int, y: int, flipped: bool) -> int | None:
+    if x is None or y is None:
+        return None
+    if x < 0 or y < 0 or x >= _BOARD_SIZE or y >= _BOARD_SIZE:
+        return None
+    col = int(x // _SQ_SIZE)
+    row = int(y // _SQ_SIZE)
+    return _display_to_square(row, col, flipped)
 
 
 # ── Default state ─────────────────────────────────────────────────────────────
@@ -219,8 +175,20 @@ def _default_state() -> dict:
     }
 
 
+def _status_text(board: chess.Board, human_white: bool) -> str:
+    if board.is_game_over():
+        outcome = board.outcome()
+        if outcome and outcome.winner is None:
+            return f"🤝 Hòa! ({outcome.termination.name})"
+        if outcome and outcome.winner is not None:
+            human_color = chess.WHITE if human_white else chess.BLACK
+            return "🏆 Bạn thắng!" if outcome.winner == human_color else "😢 Stockfish thắng!"
+        return f"🏁 Kết thúc: {board.result()}"
+    return "Lượt của bạn 🟢"
+
+
 # ── Event handlers ────────────────────────────────────────────────────────────
-def start_game(color_choice: str, _state: dict) -> tuple[str, dict]:
+def start_game(color_choice: str, _state: dict) -> tuple[Image.Image, dict, str]:
     """Reset board and optionally let engine play first."""
     human_white = color_choice.startswith("Trắng")
     flipped = not human_white
@@ -237,43 +205,16 @@ def start_game(color_choice: str, _state: dict) -> tuple[str, dict]:
 
     state["fen"] = board.fen()
     state["history"] = [board.fen()]
-    status = "Lượt của bạn 🟢" if not board.is_game_over() else "🏁 Ván kết thúc!"
-    return _make_board_html(board, flipped=flipped, status=status), state
+    return _render_board(board, flipped=flipped), state, _status_text(board, human_white)
 
 
-def _outcome_status(board: chess.Board, human_white: bool) -> str:
-    outcome = board.outcome()
-    if outcome is None:
-        return f"🏁 Kết thúc: {board.result()}"
-    if outcome.winner is None:
-        return f"🤝 Hòa! ({outcome.termination.name})"
-    human_color = chess.WHITE if human_white else chess.BLACK
-    if outcome.winner == human_color:
-        return "🏆 Bạn thắng!"
-    return "😢 Stockfish thắng!"
-
-
-def handle_click(sq_str: str, state: dict) -> tuple[str, dict]:
+def handle_click(state: dict, evt: gr.SelectData) -> tuple[Image.Image, dict, str]:
     """Process a square click: select piece or execute move."""
-    state = dict(state)  # work on a copy so callers are not mutated
-    if not sq_str:
-        return gr.update(), state
-
-    # sq_str is "square_timestamp" to ensure every click triggers change
-    try:
-        sq = int(sq_str.split("_")[0])
-    except ValueError:
-        return gr.update(), state
-
-    if state.get("game_over"):
+    state = dict(state)
+    if evt is None:
         board = chess.Board(state["fen"])
-        return (
-            _make_board_html(
-                board,
-                flipped=state["flipped"],
-                status=_outcome_status(board, state["human_white"]),
-            ),
-            state,
+        return _render_board(board, flipped=state["flipped"]), state, _status_text(
+            board, state["human_white"]
         )
 
     board = chess.Board(state["fen"])
@@ -281,9 +222,16 @@ def handle_click(sq_str: str, state: dict) -> tuple[str, dict]:
     flipped: bool = state["flipped"]
     human_color = chess.WHITE if human_white else chess.BLACK
 
+    if state.get("game_over"):
+        return _render_board(board, flipped=flipped), state, _status_text(board, human_white)
+
+    sq = _pixel_to_square(evt.index[0], evt.index[1], flipped)
+    if sq is None:
+        return _render_board(board, flipped=flipped), state, _status_text(board, human_white)
+
     # Ignore clicks when it's not the human's turn
     if board.turn != human_color:
-        return gr.update(), state
+        return _render_board(board, flipped=flipped), state, _status_text(board, human_white)
 
     selected: int | None = state.get("selected")
 
@@ -294,56 +242,56 @@ def handle_click(sq_str: str, state: dict) -> tuple[str, dict]:
             legal_from = [m for m in board.legal_moves if m.from_square == sq]
             state["selected"] = sq
             state["valid_targets"] = [m.to_square for m in legal_from]
-            html = _make_board_html(
+            return (
+                _render_board(
+                    board,
+                    selected=sq,
+                    valid_targets=state["valid_targets"],
+                    flipped=flipped,
+                ),
+                state,
+                "Chọn ô đến 🎯",
+            )
+        return _render_board(board, flipped=flipped), state, _status_text(board, human_white)
+
+    # ── A piece is already selected ────────────────────────────────────────────
+    if sq == selected:
+        state["selected"] = None
+        state["valid_targets"] = []
+        return _render_board(board, flipped=flipped), state, _status_text(board, human_white)
+
+    own_piece = board.piece_at(sq)
+    if own_piece and own_piece.color == human_color:
+        legal_from = [m for m in board.legal_moves if m.from_square == sq]
+        state["selected"] = sq
+        state["valid_targets"] = [m.to_square for m in legal_from]
+        return (
+            _render_board(
                 board,
                 selected=sq,
                 valid_targets=state["valid_targets"],
                 flipped=flipped,
-                status="Chọn ô đến 🎯",
-            )
-        else:
-            html = _make_board_html(board, flipped=flipped, status="Lượt của bạn 🟢")
-        return html, state
-
-    # ── A piece is already selected ────────────────────────────────────────────
-    if sq == selected:
-        # Deselect
-        state["selected"] = None
-        state["valid_targets"] = []
-        html = _make_board_html(board, flipped=flipped, status="Lượt của bạn 🟢")
-        return html, state
-
-    own_piece = board.piece_at(sq)
-    if own_piece and own_piece.color == human_color:
-        # Re-select a different own piece
-        legal_from = [m for m in board.legal_moves if m.from_square == sq]
-        state["selected"] = sq
-        state["valid_targets"] = [m.to_square for m in legal_from]
-        html = _make_board_html(
-            board,
-            selected=sq,
-            valid_targets=state["valid_targets"],
-            flipped=flipped,
-            status="Chọn ô đến 🎯",
+            ),
+            state,
+            "Chọn ô đến 🎯",
         )
-        return html, state
 
     # Attempt to move selected → sq
     candidates = [
         m for m in board.legal_moves if m.from_square == selected and m.to_square == sq
     ]
     if not candidates:
-        # Invalid destination – keep selection
-        html = _make_board_html(
-            board,
-            selected=selected,
-            valid_targets=state["valid_targets"],
-            flipped=flipped,
-            status="❌ Nước đi không hợp lệ!",
+        return (
+            _render_board(
+                board,
+                selected=selected,
+                valid_targets=state["valid_targets"],
+                flipped=flipped,
+            ),
+            state,
+            "❌ Nước đi không hợp lệ!",
         )
-        return html, state
 
-    # Auto-promote to queen
     move = next((m for m in candidates if m.promotion == chess.QUEEN), candidates[0])
     board.push(move)
     state["selected"] = None
@@ -352,45 +300,32 @@ def handle_click(sq_str: str, state: dict) -> tuple[str, dict]:
 
     if board.is_game_over():
         state["game_over"] = True
-        status = _outcome_status(board, human_white)
-        html = _make_board_html(board, flipped=flipped, status=status)
-        return html, state
+        return _render_board(board, flipped=flipped), state, _status_text(board, human_white)
 
-    # Engine reply
     engine_mv = _engine_move(board)
     if engine_mv:
         board.push(engine_mv)
         state["fen"] = board.fen()
 
-    # Save position to history for undo (after human + engine have both moved)
     history = list(state.get("history", []))
     history.append(board.fen())
     state["history"] = history
 
     if board.is_game_over():
         state["game_over"] = True
-        status = _outcome_status(board, human_white)
-    else:
-        status = "Lượt của bạn 🟢"
-
-    html = _make_board_html(board, flipped=flipped, status=status)
-    return html, state
+    return _render_board(board, flipped=flipped), state, _status_text(board, human_white)
 
 
-def undo_move(state: dict) -> tuple[str, dict]:
+def undo_move(state: dict) -> tuple[Image.Image, dict, str]:
     """Undo the last human + engine move pair using the history stack."""
-    state = dict(state)  # work on a copy
+    state = dict(state)
     flipped = state["flipped"]
     history: list[str] = list(state.get("history", []))
 
     if len(history) <= 1:
         board = chess.Board(state["fen"])
-        html = _make_board_html(
-            board, flipped=flipped, status="⚠️ Không có nước nào để đi lại!"
-        )
-        return html, state
+        return _render_board(board, flipped=flipped), state, "⚠️ Không có nước nào để đi lại!"
 
-    # Pop the most recent position to go one full turn back
     history.pop()
     prev_fen = history[-1]
 
@@ -401,21 +336,14 @@ def undo_move(state: dict) -> tuple[str, dict]:
     state["game_over"] = False
 
     board = chess.Board(prev_fen)
-    html = _make_board_html(
-        board, flipped=flipped, status="⏪ Đã đi lại. Lượt của bạn 🟢"
-    )
-    return html, state
+    return _render_board(board, flipped=flipped), state, "⏪ Đã đi lại. Lượt của bạn 🟢"
 
 
 # ── Gradio UI ─────────────────────────────────────────────────────────────────
 _INITIAL_STATE = _default_state()
-_initial_board = _make_board_html(
-    chess.Board(),
-    flipped=False,
-    status="Chọn màu quân rồi bấm '🎮 Ván mới' để bắt đầu!",
-)
+_initial_board = _render_board(chess.Board(), flipped=False)
 
-with gr.Blocks(title="Cờ Vua vs Stockfish", theme=gr.themes.Soft(), css=_CSS, js=_JS) as demo:
+with gr.Blocks(title="Cờ Vua vs Stockfish", theme=gr.themes.Soft()) as demo:
     gr.Markdown(
         "# ♟️ Cờ Vua – Chơi với Stockfish\n"
         "Click vào quân cờ để chọn, rồi click ô đến để di chuyển. "
@@ -434,35 +362,26 @@ with gr.Blocks(title="Cờ Vua vs Stockfish", theme=gr.themes.Soft(), css=_CSS, 
         new_game_btn = gr.Button("🎮 Ván mới", variant="primary", scale=1)
         undo_btn = gr.Button("⏪ Đi lại", scale=1)
 
-    board_html = gr.HTML(value=_initial_board)
+    status_md = gr.Markdown("Chọn màu quân rồi bấm '🎮 Ván mới' để bắt đầu!")
+    board_img = gr.Image(value=_initial_board, type="pil", label="Bàn cờ")
 
-    # Hidden textbox – receives square index from JavaScript onclick handlers.
-    # elem_id="sq-input" lets the JS in _JS locate it in the DOM.
-    sq_input = gr.Textbox(
-        value="",
-        visible=False,
-        elem_id="sq-input",
-        label="square",
-    )
-
-    # Wire events
     new_game_btn.click(
         fn=start_game,
         inputs=[color_radio, state],
-        outputs=[board_html, state],
+        outputs=[board_img, state, status_md],
     )
 
-    sq_input.input(
+    board_img.select(
         fn=handle_click,
-        inputs=[sq_input, state],
-        outputs=[board_html, state],
+        inputs=[state],
+        outputs=[board_img, state, status_md],
     )
 
     undo_btn.click(
         fn=undo_move,
         inputs=[state],
-        outputs=[board_html, state],
+        outputs=[board_img, state, status_md],
     )
 
 if __name__ == "__main__":
-    demo.launch(ssr_mode=False)
+    demo.launch()
