@@ -86,15 +86,22 @@ _CSS = """
 """
 
 _JS = """
+function gradioRoot(){
+  const app = document.querySelector('gradio-app');
+  if(app && app.shadowRoot) return app.shadowRoot;
+  return document;
+}
+
+function findInput(){
+  const root = gradioRoot();
+  return root.querySelector('#sq-input textarea') ||
+         root.querySelector('#sq-input input[type="text"]') ||
+         root.querySelector('#sq-input input');
+}
+
 function sqClick(sq){
   var ts = sq + '_' + Date.now();
-  var inp = document.querySelector('#sq-input textarea') ||
-            document.querySelector('#sq-input input[type="text"]') ||
-            document.querySelector('#sq-input input');
-  if(!inp){
-    var w=document.getElementById('sq-input');
-    if(w) inp=w.querySelector('textarea,input');
-  }
+  var inp = findInput();
   if(!inp) return;
   try{
     var proto = inp.tagName==='TEXTAREA'
@@ -114,13 +121,23 @@ function findSquareId(el){
   return null;
 }
 
-document.addEventListener('click', (event) => {
-  const cell = event.target.closest('.sq');
-  if(!cell) return;
-  const sq = findSquareId(cell);
-  if(!sq) return;
-  sqClick(sq);
-});
+function attachBoardListener(){
+  const root = gradioRoot();
+  root.addEventListener('click', (event) => {
+    const cell = event.target.closest('.sq');
+    if(!cell) return;
+    const sq = findSquareId(cell);
+    if(!sq) return;
+    sqClick(sq);
+  });
+}
+
+if(document.readyState === 'loading'){
+  document.addEventListener('DOMContentLoaded', attachBoardListener);
+} else {
+  attachBoardListener();
+}
+
 window.sqClick = sqClick;
 """
 
@@ -189,7 +206,7 @@ def _make_board_html(
     )
 
 
-# ── Default state ──────��──────────────────────────────────────────────────────
+# ── Default state ─────────────────────────────────────────────────────────────
 def _default_state() -> dict:
     return {
         "fen": chess.STARTING_FEN,
@@ -448,4 +465,4 @@ with gr.Blocks(title="Cờ Vua vs Stockfish", theme=gr.themes.Soft(), css=_CSS, 
     )
 
 if __name__ == "__main__":
-    demo.launch()
+    demo.launch(ssr_mode=False)
