@@ -402,7 +402,7 @@ with gr.Blocks(title="Cờ Vua vs Stockfish", theme=gr.themes.Soft(), css=_CSS, 
         new_game_btn = gr.Button("🎮 Ván mới", variant="primary", scale=1)
         undo_btn = gr.Button("⏪ Đi lại", scale=1)
 
-    board_html = gr.HTML(value=_initial_board, sanitize=False)
+    board_html = gr.HTML(value=_initial_board)
 
     # Hidden textbox – receives square index from JavaScript onclick handlers.
     # elem_id="sq-input" lets the JS in _JS locate it in the DOM.
