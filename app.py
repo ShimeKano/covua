@@ -91,6 +91,69 @@ def _square_to_display(square: int, flipped: bool) -> Tuple[int, int]:
     return 7 - rank, file
 
 
+def _render_piece_tile(piece: chess.Piece | None, is_light: bool) -> Image.Image:
+    image = Image.new("RGB", (_SQ_SIZE, _SQ_SIZE), _LIGHT if is_light else _DARK)
+    if piece:
+        draw = ImageDraw.Draw(image)
+        symbol = PIECES.get((piece.piece_type, piece.color), "?")
+        fill = (250, 250, 250) if piece.color == chess.WHITE else (15, 15, 15)
+        draw.text(
+            (_SQ_SIZE / 2, _SQ_SIZE / 2),
+            symbol,
+            fill=fill,
+            font=_FONT,
+            anchor="mm",
+            stroke_width=2,
+            stroke_fill=(20, 20, 20) if piece.color == chess.WHITE else (220, 220, 220),
+        )
+    return image
+
+
+def _tile_signature(tile: Image.Image, size: int = 16) -> list[int]:
+    small = tile.resize((size, size)).convert("RGB")
+    data = list(small.getdata())
+    return [c for rgb in data for c in rgb]
+
+
+_TEMPLATE_SIGS: dict[tuple[int | None, bool | None, bool], list[int]] = {}
+
+
+def _prepare_templates() -> None:
+    if _TEMPLATE_SIGS:
+        return
+    for is_light in (True, False):
+        _TEMPLATE_SIGS[(None, None, is_light)] = _tile_signature(
+            _render_piece_tile(None, is_light)
+        )
+    for piece_type in (chess.KING, chess.QUEEN, chess.ROOK, chess.BISHOP, chess.KNIGHT, chess.PAWN):
+        for color in (chess.WHITE, chess.BLACK):
+            piece = chess.Piece(piece_type, color)
+            for is_light in (True, False):
+                _TEMPLATE_SIGS[(piece_type, color, is_light)] = _tile_signature(
+                    _render_piece_tile(piece, is_light)
+                )
+
+
+def _match_tile(tile: Image.Image, is_light: bool) -> chess.Piece | None:
+    _prepare_templates()
+    sig = _tile_signature(tile)
+    best_key = (None, None, is_light)
+    best_score = float("inf")
+
+    for (piece_type, color, light), template_sig in _TEMPLATE_SIGS.items():
+        if light != is_light:
+            continue
+        score = sum(abs(a - b) for a, b in zip(sig, template_sig))
+        if score < best_score:
+            best_score = score
+            best_key = (piece_type, color, light)
+
+    piece_type, color, _ = best_key
+    if piece_type is None:
+        return None
+    return chess.Piece(piece_type, bool(color))
+
+
 def _render_board(
     board: chess.Board,
     selected: int | None = None,
@@ -162,6 +225,33 @@ def _pixel_to_square(x: int, y: int, flipped: bool) -> int | None:
     return _display_to_square(row, col, flipped)
 
 
+def _extract_board(image: Image.Image) -> Image.Image:
+    img = image.convert("RGB")
+    if img.size != (_BOARD_SIZE, _BOARD_SIZE):
+        img = img.resize((_BOARD_SIZE, _BOARD_SIZE))
+    return img
+
+
+def _parse_board_from_image(image: Image.Image, flipped: bool) -> chess.Board:
+    img = _extract_board(image)
+    board = chess.Board(None)
+    board.clear_board()
+    board.castling_rights = 0
+
+    for row in range(8):
+        for col in range(8):
+            sq = _display_to_square(row, col, flipped)
+            x0 = col * _SQ_SIZE
+            y0 = row * _SQ_SIZE
+            tile = img.crop((x0, y0, x0 + _SQ_SIZE, y0 + _SQ_SIZE))
+            is_light = (row + col) % 2 == 1
+            piece = _match_tile(tile, is_light)
+            if piece:
+                board.set_piece_at(sq, piece)
+
+    return board
+
+
 # ── Default state ─────────────────────────────────────────────────────────────
 def _default_state() -> dict:
     return {
@@ -206,6 +296,39 @@ def start_game(color_choice: str, _state: dict) -> tuple[Image.Image, dict, str]
     state["fen"] = board.fen()
     state["history"] = [board.fen()]
     return _render_board(board, flipped=flipped), state, _status_text(board, human_white)
+
+
+def import_from_image(
+    image: Image.Image | None,
+    orientation_choice: str,
+    to_move_choice: str,
+    color_choice: str,
+    state: dict,
+) -> tuple[Image.Image, dict, str]:
+    if image is None:
+        board = chess.Board(state["fen"])
+        return _render_board(board, flipped=state["flipped"]), state, "⚠️ Chưa chọn ảnh."
+
+    flipped_image = orientation_choice.startswith("Đen")
+    board = _parse_board_from_image(image, flipped=flipped_image)
+    human_white = color_choice.startswith("Trắng")
+
+    board.turn = chess.WHITE if to_move_choice.startswith("Trắng") else chess.BLACK
+    board.castling_rights = 0
+    board.ep_square = None
+
+    if board.turn != (chess.WHITE if human_white else chess.BLACK):
+        engine_mv = _engine_move(board)
+        if engine_mv:
+            board.push(engine_mv)
+
+    state = _default_state()
+    state["human_white"] = human_white
+    state["flipped"] = not human_white
+    state["fen"] = board.fen()
+    state["history"] = [board.fen()]
+
+    return _render_board(board, flipped=state["flipped"]), state, "✅ Đã nhập ảnh bàn cờ."
 
 
 def handle_click(state: dict, evt: gr.SelectData) -> tuple[Image.Image, dict, str]:
@@ -365,9 +488,29 @@ with gr.Blocks(title="Cờ Vua vs Stockfish", theme=gr.themes.Soft()) as demo:
     status_md = gr.Markdown("Chọn màu quân rồi bấm '🎮 Ván mới' để bắt đầu!")
     board_img = gr.Image(value=_initial_board, type="pil", label="Bàn cờ")
 
+    with gr.Row():
+        upload_img = gr.Image(type="pil", label="Nhập ảnh bàn cờ (từ app)")
+        orientation_radio = gr.Radio(
+            choices=["Trắng ở dưới", "Đen ở dưới"],
+            value="Trắng ở dưới",
+            label="Hướng ảnh",
+        )
+        to_move_radio = gr.Radio(
+            choices=["Trắng đi", "Đen đi"],
+            value="Trắng đi",
+            label="Lượt tiếp theo",
+        )
+        import_btn = gr.Button("📥 Nhập ảnh", variant="secondary")
+
     new_game_btn.click(
         fn=start_game,
         inputs=[color_radio, state],
+        outputs=[board_img, state, status_md],
+    )
+
+    import_btn.click(
+        fn=import_from_image,
+        inputs=[upload_img, orientation_radio, to_move_radio, color_radio, state],
         outputs=[board_img, state, status_md],
     )
 
