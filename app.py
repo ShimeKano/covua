@@ -81,10 +81,12 @@ _CSS = """
   background:transparent;border:5px solid rgba(0,0,0,.22);
   border-radius:50%;pointer-events:none;z-index:2}
 .last{background:#cdd26a!important}
-.wp{font-size:48px;line-height:1;color:#fff;
-  text-shadow:0 0 2px #000,0 0 4px #000,1px 1px 0 #444}
-.bp{font-size:48px;line-height:1;color:#111;
-  text-shadow:0 0 1px #888,1px 1px 0 #eee}
+.wp{font-size:50px;line-height:1;color:#fff;
+  -webkit-text-stroke:1.8px #111;
+  text-shadow:0 2px 2px rgba(0,0,0,.75),0 0 5px rgba(0,0,0,.65)}
+.bp{font-size:50px;line-height:1;color:#080808;
+  -webkit-text-stroke:1.5px #fff;
+  text-shadow:0 2px 2px rgba(255,255,255,.55),0 0 5px rgba(255,255,255,.45)}
 </style>
 """
 
