@@ -190,6 +190,7 @@ def _default_state() -> dict:
         "human_white": True,
         "flipped": False,
         "game_over": False,
+        "custom_fen": None,
     }
 
 
@@ -381,6 +382,115 @@ def undo_move(state: dict) -> tuple[str, dict]:
     return html, state
 
 
+
+# ── Custom board editor ───────────────────────────────────────────────────────
+PIECE_CHOICES = {
+    "Trống": None,
+    "Trắng ♔ Vua": chess.Piece(chess.KING, chess.WHITE),
+    "Trắng ♕ Hậu": chess.Piece(chess.QUEEN, chess.WHITE),
+    "Trắng ♖ Xe": chess.Piece(chess.ROOK, chess.WHITE),
+    "Trắng ♗ Tượng": chess.Piece(chess.BISHOP, chess.WHITE),
+    "Trắng ♘ Mã": chess.Piece(chess.KNIGHT, chess.WHITE),
+    "Trắng ♙ Tốt": chess.Piece(chess.PAWN, chess.WHITE),
+    "Đen ♚ Vua": chess.Piece(chess.KING, chess.BLACK),
+    "Đen ♛ Hậu": chess.Piece(chess.QUEEN, chess.BLACK),
+    "Đen ♜ Xe": chess.Piece(chess.ROOK, chess.BLACK),
+    "Đen ♝ Tượng": chess.Piece(chess.BISHOP, chess.BLACK),
+    "Đen ♞ Mã": chess.Piece(chess.KNIGHT, chess.BLACK),
+    "Đen ♟ Tốt": chess.Piece(chess.PAWN, chess.BLACK),
+}
+
+
+def _parse_fen(fen: str) -> chess.Board:
+    return chess.Board(fen.strip())
+
+
+def edit_square(fen: str, square_name: str, piece_name: str) -> tuple[str, str]:
+    try:
+        board = _parse_fen(fen)
+        sq = chess.parse_square(square_name.lower().strip())
+        board.set_piece_at(sq, PIECE_CHOICES.get(piece_name))
+        board.clear_stack()
+        return board.fen(), f"Đã cập nhật ô **{square_name}**."
+    except Exception as exc:
+        return fen, f"❌ FEN/ô cờ không hợp lệ: {exc}"
+
+
+def clear_square(fen: str, square_name: str) -> tuple[str, str]:
+    try:
+        board = _parse_fen(fen)
+        sq = chess.parse_square(square_name.lower().strip())
+        board.remove_piece_at(sq)
+        board.clear_stack()
+        return board.fen(), f"🗑️ Đã xóa quân ở **{square_name}**."
+    except Exception as exc:
+        return fen, f"❌ Không thể xóa: {exc}"
+
+
+def clear_custom_board() -> tuple[str, str]:
+    board = chess.Board.empty()
+    return board.fen(), "🧹 Đã xóa toàn bộ quân cờ. Hãy đặt lại ít nhất hai vua trước khi bắt đầu."
+
+
+def reset_custom_board() -> tuple[str, str]:
+    return chess.STARTING_FEN, "♟️ Đã khôi phục vị trí ban đầu."
+
+
+def validate_fen(fen: str) -> str:
+    try:
+        board = _parse_fen(fen)
+        if not board.is_valid():
+            return (
+                "⚠️ FEN đọc được nhưng vị trí **không hợp lệ theo luật cờ vua**. "
+                "Bạn vẫn có thể tiếp tục chỉnh sửa."
+            )
+        return "✅ Vị trí hợp lệ."
+    except Exception as exc:
+        return f"❌ FEN không hợp lệ: {exc}"
+
+
+def start_custom_game(color_choice: str, fen: str, _state: dict) -> tuple[str, dict]:
+    try:
+        board = _parse_fen(fen)
+    except Exception:
+        return gr.update(), dict(_state)
+
+    if not board.is_valid():
+        return (
+            _make_board_html(
+                board,
+                flipped=color_choice.startswith("Đen"),
+                status="❌ Vị trí chưa hợp lệ. Cần đủ 2 vua và trạng thái cờ hợp lệ.",
+            ),
+            dict(_state),
+        )
+
+    human_white = color_choice.startswith("Trắng")
+    human_color = chess.WHITE if human_white else chess.BLACK
+    flipped = not human_white
+
+    state = _default_state()
+    state["human_white"] = human_white
+    state["flipped"] = flipped
+    state["custom_fen"] = board.fen()
+
+    if board.turn != human_color and not board.is_game_over():
+        move = _engine_move(board)
+        if move:
+            board.push(move)
+
+    state["fen"] = board.fen()
+    state["history"] = [board.fen()]
+    state["game_over"] = board.is_game_over()
+
+    status = (
+        _outcome_status(board, human_white)
+        if board.is_game_over()
+        else "Lượt của bạn 🟢"
+    )
+    return _make_board_html(board, flipped=flipped, status=status), state
+
+
 # ── Gradio UI ──────────────────────────────────────────────────────────────────
 _INITIAL_STATE = _default_state()
 _initial_board = _make_board_html(
@@ -393,7 +503,8 @@ with gr.Blocks(title="Cờ Vua vs Stockfish", theme=gr.themes.Soft()) as demo:
     gr.Markdown(
         "# ♟️ Cờ Vua – Chơi với Stockfish\n"
         "Click vào quân cờ để chọn, rồi click ô đến để di chuyển. "
-        "Chơi quân đen → bàn cờ xoay ngược."
+        "Có thể mở **🛠️ Nhập / chỉnh bàn cờ** để tự đặt hoặc xóa quân cờ. "
+        "Ứng dụng không dùng GPU."
     )
 
     state = gr.State(_INITIAL_STATE)
@@ -410,8 +521,44 @@ with gr.Blocks(title="Cờ Vua vs Stockfish", theme=gr.themes.Soft()) as demo:
 
     board_html = gr.HTML(value=_initial_board)
 
-    # Hidden textbox – receives square index from JavaScript onclick handlers.
-    # elem_id="sq-input" lets the JS in _JS locate it in the DOM.
+    with gr.Accordion("🛠️ Nhập / chỉnh bàn cờ", open=False):
+        gr.Markdown(
+            "Đặt quân theo từng ô hoặc sửa trực tiếp FEN. "
+            "**Trống** sẽ thay thế quân hiện có bằng ô trống; nút 🗑️ xóa riêng một ô."
+        )
+
+        with gr.Row():
+            editor_square = gr.Dropdown(
+                choices=[f"{chr(97 + f)}{r + 1}" for r in range(8) for f in range(8)],
+                value="e2",
+                label="Ô cờ",
+                scale=1,
+            )
+            editor_piece = gr.Dropdown(
+                choices=list(PIECE_CHOICES.keys()),
+                value="Trắng ♙ Tốt",
+                label="Quân cờ",
+                scale=2,
+            )
+
+        with gr.Row():
+            place_piece_btn = gr.Button("♟️ Đặt / thay quân", variant="primary")
+            remove_piece_btn = gr.Button("🗑️ Xóa ô")
+            clear_board_btn = gr.Button("🧹 Xóa toàn bộ")
+            reset_board_btn = gr.Button("♟️ Vị trí ban đầu")
+
+        custom_fen = gr.Textbox(
+            value=chess.STARTING_FEN,
+            label="FEN của bàn cờ",
+            lines=2,
+        )
+
+        with gr.Row():
+            validate_fen_btn = gr.Button("🔎 Kiểm tra FEN")
+            use_custom_btn = gr.Button("▶️ Dùng vị trí này", variant="primary")
+
+        editor_status = gr.Markdown("✅ Vị trí ban đầu.")
+
     sq_input = gr.Textbox(
         value="",
         visible=False,
@@ -419,7 +566,6 @@ with gr.Blocks(title="Cờ Vua vs Stockfish", theme=gr.themes.Soft()) as demo:
         label="square",
     )
 
-    # Wire events
     new_game_btn.click(
         fn=start_game,
         inputs=[color_radio, state],
@@ -435,6 +581,40 @@ with gr.Blocks(title="Cờ Vua vs Stockfish", theme=gr.themes.Soft()) as demo:
     undo_btn.click(
         fn=undo_move,
         inputs=[state],
+        outputs=[board_html, state],
+    )
+
+    place_piece_btn.click(
+        fn=edit_square,
+        inputs=[custom_fen, editor_square, editor_piece],
+        outputs=[custom_fen, editor_status],
+    )
+
+    remove_piece_btn.click(
+        fn=clear_square,
+        inputs=[custom_fen, editor_square],
+        outputs=[custom_fen, editor_status],
+    )
+
+    clear_board_btn.click(
+        fn=clear_custom_board,
+        outputs=[custom_fen, editor_status],
+    )
+
+    reset_board_btn.click(
+        fn=reset_custom_board,
+        outputs=[custom_fen, editor_status],
+    )
+
+    validate_fen_btn.click(
+        fn=validate_fen,
+        inputs=[custom_fen],
+        outputs=[editor_status],
+    )
+
+    use_custom_btn.click(
+        fn=start_custom_game,
+        inputs=[color_radio, custom_fen, state],
         outputs=[board_html, state],
     )
 
