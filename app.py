@@ -87,14 +87,16 @@ _CSS = """
 .fls{display:flex;margin-top:2px;margin-left:26px}
 .board{display:grid;grid-template-columns:repeat(8,68px);
   grid-template-rows:repeat(8,68px);
-  background-image:url("https://raw.githubusercontent.com/ShimeKano/covua/main/ass/board.png");
-  background-size:100% 100%;background-position:center;
-  border:3px solid #444;box-shadow:4px 6px 18px rgba(0,0,0,.45)}
+  overflow:hidden;border:8px solid #352a22;border-radius:5px;
+  background:#e8dfcc;
+  box-shadow:0 2px 0 #7a6046,0 8px 22px rgba(0,0,0,.28)}
+
 .sq{width:68px;height:68px;display:flex;align-items:center;
   justify-content:center;cursor:pointer;position:relative;
   transition:filter .08s}
-.sq:hover{filter:brightness(.88)}
-.lt,.dk{background:transparent}
+.sq:hover{filter:brightness(.94)}
+.lt{background:#e9e2d0}
+.dk{background:#789184}
 .sel{background:#7fc97f!important}
 .edsel{background:#f6c445!important;box-shadow:inset 0 0 0 4px #8a5a00}
 .mv::after{content:'';position:absolute;width:24px;height:24px;
