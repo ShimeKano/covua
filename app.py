@@ -40,10 +40,13 @@ def _find_stockfish() -> str:
     return "stockfish"  # hope it is on PATH
 
 
-def _engine_move(board: chess.Board) -> chess.Move | None:
-    """Ask Stockfish for one move; fall back to first legal move on error."""
+def _engine_move(board: chess.Board, skill_level: int = 8) -> chess.Move | None:
+    """Ask Stockfish for a move at the selected Skill Level (0–20)."""
     try:
         with chess.engine.SimpleEngine.popen_uci(_find_stockfish()) as eng:
+            # Stockfish supports Skill Level 0 (weakest) through 20 (strongest).
+            level = max(0, min(20, int(skill_level)))
+            eng.configure({"Skill Level": level})
             result = eng.play(board, chess.engine.Limit(time=1.0))
             return result.move
     except Exception:
@@ -196,6 +199,7 @@ def _default_state() -> dict:
         "selected": None,
         "valid_targets": [],
         "human_white": True,
+        "skill_level": 8,
         "flipped": False,
         "game_over": False,
         "editor_mode": False,
@@ -216,17 +220,18 @@ def _render(board: chess.Board, state: dict, status: str = "") -> str:
     )
 
 
-def start_game(color_choice: str, _state: dict):
+def start_game(color_choice: str, skill_level: float, _state: dict):
     human_white = color_choice.startswith("Trắng")
     flipped = not human_white
     board = chess.Board()
 
     state = _default_state()
     state["human_white"] = human_white
+    state["skill_level"] = max(0, min(20, int(skill_level)))
     state["flipped"] = flipped
 
     if not human_white:
-        move = _engine_move(board)
+        move = _engine_move(board, state["skill_level"])
         if move:
             board.push(move)
 
@@ -330,7 +335,7 @@ def handle_click(sq_str: str, state: dict):
         state["game_over"] = True
         return _render(board, state, _outcome_status(board, human_white)), state, gr.update(), gr.update(), gr.update()
 
-    engine_mv = _engine_move(board)
+    engine_mv = _engine_move(board, state.get("skill_level", 8))
     if engine_mv:
         board.push(engine_mv)
         state["fen"] = board.fen()
@@ -502,7 +507,7 @@ def apply_fen(fen: str, state: dict):
     return _render(board, state, "🛠️ Đã áp dụng FEN lên bàn cờ chính."), state, board.fen(), "✅ Đã áp dụng FEN."
 
 
-def start_custom_game(color_choice: str, fen: str, _state: dict):
+def start_custom_game(color_choice: str, fen: str, skill_level: float, _state: dict):
     state = dict(_state)
     try:
         board = _safe_board(fen)
@@ -524,12 +529,13 @@ def start_custom_game(color_choice: str, fen: str, _state: dict):
 
     state = _default_state()
     state["human_white"] = human_white
+    state["skill_level"] = max(0, min(20, int(skill_level)))
     state["flipped"] = flipped
     state["fen"] = board.fen()
     state["history"] = [board.fen()]
 
     if board.turn != human_color and not board.is_game_over():
-        move = _engine_move(board)
+        move = _engine_move(board, state["skill_level"])
         if move:
             board.push(move)
             state["fen"] = board.fen()
@@ -538,6 +544,13 @@ def start_custom_game(color_choice: str, fen: str, _state: dict):
     state["game_over"] = board.is_game_over()
     status = _outcome_status(board, human_white) if board.is_game_over() else "Lượt của bạn 🟢"
     return _render(board, state, status), state, "🛠️ Chế độ xếp cờ", board.fen(), "▶️ Đã bắt đầu chơi từ vị trí này."
+
+
+def set_difficulty(skill_level: float, state: dict):
+    """Store slider changes so they affect the next Stockfish move immediately."""
+    state = dict(state)
+    state["skill_level"] = max(0, min(20, int(skill_level)))
+    return state
 
 
 # ── Gradio UI ──────────────────────────────────────────────────────────────────
@@ -567,6 +580,15 @@ with gr.Blocks(title="Cờ Vua vs Stockfish", theme=gr.themes.Soft()) as demo:
         new_game_btn = gr.Button("🎮 Ván mới", variant="primary", scale=1)
         undo_btn = gr.Button("⏪ Đi lại", scale=1)
         editor_mode_btn = gr.Button("🛠️ Chế độ xếp cờ", scale=1)
+
+    difficulty_slider = gr.Slider(
+        minimum=0,
+        maximum=20,
+        step=1,
+        value=8,
+        label="Độ khó Stockfish (0 = dễ nhất, 20 = mạnh nhất)",
+        info="Thay đổi thanh này sẽ áp dụng cho nước đi AI tiếp theo.",
+    )
 
     board_html = gr.HTML(value=_initial_board)
 
@@ -603,9 +625,15 @@ with gr.Blocks(title="Cờ Vua vs Stockfish", theme=gr.themes.Soft()) as demo:
 
     sq_input = gr.Textbox(value="", visible=False, elem_id="sq-input", label="square")
 
+    difficulty_slider.change(
+        fn=set_difficulty,
+        inputs=[difficulty_slider, state],
+        outputs=[state],
+    )
+
     new_game_btn.click(
         fn=start_game,
-        inputs=[color_radio, state],
+        inputs=[color_radio, difficulty_slider, state],
         outputs=[board_html, state, editor_mode_btn, custom_fen, editor_status],
     )
 
@@ -665,7 +693,7 @@ with gr.Blocks(title="Cờ Vua vs Stockfish", theme=gr.themes.Soft()) as demo:
 
     use_custom_btn.click(
         fn=start_custom_game,
-        inputs=[color_radio, custom_fen, state],
+        inputs=[color_radio, custom_fen, difficulty_slider, state],
         outputs=[board_html, state, editor_mode_btn, custom_fen, editor_status],
     )
 
