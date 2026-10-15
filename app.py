@@ -87,6 +87,8 @@ _CSS = """
 .fls{display:flex;margin-top:2px;margin-left:26px}
 .board{display:grid;grid-template-columns:repeat(8,68px);
   grid-template-rows:repeat(8,68px);
+  background-image:url("https://raw.githubusercontent.com/ShimeKano/covua/main/ass/board.png");
+  background-size:100% 100%;background-position:center;
   border:3px solid #444;box-shadow:4px 6px 18px rgba(0,0,0,.45)}
 .sq{width:68px;height:68px;display:flex;align-items:center;
   justify-content:center;cursor:pointer;position:relative;
@@ -102,7 +104,8 @@ _CSS = """
   border-radius:50%;pointer-events:none;z-index:2}
 .last{background:#cdd26a!important}
 .wp,.bp{width:54px;height:54px;display:flex;align-items:center;justify-content:center}
-.wp svg,.bp svg{width:100%;height:100%;display:block;filter:drop-shadow(0 2px 1px rgba(0,0,0,.3))}
+.wp img,.bp img{width:100%;height:100%;object-fit:contain;display:block;
+  image-rendering:auto;filter:drop-shadow(0 1px 1px rgba(0,0,0,.25))}
 </style>
 """
 
