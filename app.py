@@ -9,28 +9,28 @@ import chess
 import chess.engine
 import gradio as gr
 
-# ── OpenGameArt pixel-art board and piece assets ──────────────────────────────
+# ── Staunton remove.bg pieces and custom CSS board ──────────────────────────────
 # Assets are stored in this repository under /ass and loaded from its public raw URLs.
 _ASSET_BASE = "https://raw.githubusercontent.com/ShimeKano/covua/main/ass"
 
 _PIECE_ASSETS = {
-    (chess.KING, chess.WHITE): "kingW2.png",
-    (chess.QUEEN, chess.WHITE): "queenW2.png",
-    (chess.ROOK, chess.WHITE): "rookW2.png",
-    (chess.BISHOP, chess.WHITE): "bishopW2.png",
-    (chess.KNIGHT, chess.WHITE): "knightW2.png",
-    (chess.PAWN, chess.WHITE): "pawnW2.png",
-    (chess.KING, chess.BLACK): "kingB2.png",
-    (chess.QUEEN, chess.BLACK): "queenB2.png",
-    (chess.ROOK, chess.BLACK): "rookB2.png",
-    (chess.BISHOP, chess.BLACK): "bishopB2.png",
-    (chess.KNIGHT, chess.BLACK): "knightB2.png",
-    (chess.PAWN, chess.BLACK): "pawnB2.png",
+    (chess.KING, chess.WHITE): "staunton_white_king_64-removebg-preview.png",
+    (chess.QUEEN, chess.WHITE): "staunton_white_queen_64-removebg-preview.png",
+    (chess.ROOK, chess.WHITE): "staunton_white_rook_64-removebg-preview.png",
+    (chess.BISHOP, chess.WHITE): "staunton_white_bishop_64-removebg-preview.png",
+    (chess.KNIGHT, chess.WHITE): "staunton_white_knight_64-removebg-preview.png",
+    (chess.PAWN, chess.WHITE): "staunton_white_pawn_64-removebg-preview.png",
+    (chess.KING, chess.BLACK): "staunton_black_king_64-removebg-preview.png",
+    (chess.QUEEN, chess.BLACK): "staunton_black_queen_64-removebg-preview.png",
+    (chess.ROOK, chess.BLACK): "staunton_black_rook_64-removebg-preview.png",
+    (chess.BISHOP, chess.BLACK): "staunton_black_bishop_64-removebg-preview.png",
+    (chess.KNIGHT, chess.BLACK): "staunton_black_knight_64-removebg-preview.png",
+    (chess.PAWN, chess.BLACK): "staunton_black_pawn_64-removebg-preview.png",
 }
 
 
 def piece_svg(piece_type: int, white: bool) -> str:
-    """Return an HTML image tag for the matching OpenGameArt pixel-art piece."""
+    """Return an HTML image tag for the matching transparent Staunton piece."""
     filename = _PIECE_ASSETS.get(
         (piece_type, white), _PIECE_ASSETS[(chess.PAWN, white)]
     )
