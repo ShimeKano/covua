@@ -646,7 +646,7 @@ with gr.Blocks(title="Cờ Vua vs Stockfish", theme=gr.themes.Soft()) as demo:
     undo_btn.click(
         fn=undo_move,
         inputs=[state],
-        outputs=[board_html, state, gr.update(), custom_fen, editor_status],
+        outputs=[board_html, state, editor_mode_btn, custom_fen, editor_status],
     )
 
     editor_mode_btn.click(
