@@ -14,18 +14,18 @@ import gradio as gr
 _ASSET_BASE = "https://raw.githubusercontent.com/ShimeKano/covua/main/ass"
 
 _PIECE_ASSETS = {
-    (chess.KING, chess.WHITE): "kingW.png",
-    (chess.QUEEN, chess.WHITE): "queenW.png",
-    (chess.ROOK, chess.WHITE): "rookW.png",
-    (chess.BISHOP, chess.WHITE): "bishopW.png",
-    (chess.KNIGHT, chess.WHITE): "knightW.png",
-    (chess.PAWN, chess.WHITE): "pawnW.png",
-    (chess.KING, chess.BLACK): "kingB.png",
-    (chess.QUEEN, chess.BLACK): "queenB.png",
-    (chess.ROOK, chess.BLACK): "rookB.png",
-    (chess.BISHOP, chess.BLACK): "bishopB.png",
-    (chess.KNIGHT, chess.BLACK): "knightB.png",
-    (chess.PAWN, chess.BLACK): "pawnB.png",
+    (chess.KING, chess.WHITE): "kingW2.png",
+    (chess.QUEEN, chess.WHITE): "queenW2.png",
+    (chess.ROOK, chess.WHITE): "rookW2.png",
+    (chess.BISHOP, chess.WHITE): "bishopW2.png",
+    (chess.KNIGHT, chess.WHITE): "knightW2.png",
+    (chess.PAWN, chess.WHITE): "pawnW2.png",
+    (chess.KING, chess.BLACK): "kingB2.png",
+    (chess.QUEEN, chess.BLACK): "queenB2.png",
+    (chess.ROOK, chess.BLACK): "rookB2.png",
+    (chess.BISHOP, chess.BLACK): "bishopB2.png",
+    (chess.KNIGHT, chess.BLACK): "knightB2.png",
+    (chess.PAWN, chess.BLACK): "pawnB2.png",
 }
 
 
