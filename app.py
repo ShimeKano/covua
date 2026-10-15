@@ -8,22 +8,9 @@ import os
 import chess
 import chess.engine
 import gradio as gr
+from piece_icons import piece_svg
 
-# ── Unicode chess pieces ───────────────────────────────────────────────────────
-PIECES: dict[tuple[int, bool], str] = {
-    (chess.KING,   chess.WHITE): "♔",
-    (chess.QUEEN,  chess.WHITE): "♕",
-    (chess.ROOK,   chess.WHITE): "♖",
-    (chess.BISHOP, chess.WHITE): "♗",
-    (chess.KNIGHT, chess.WHITE): "♘",
-    (chess.PAWN,   chess.WHITE): "♙",
-    (chess.KING,   chess.BLACK): "♚",
-    (chess.QUEEN,  chess.BLACK): "♛",
-    (chess.ROOK,   chess.BLACK): "♜",
-    (chess.BISHOP, chess.BLACK): "♝",
-    (chess.KNIGHT, chess.BLACK): "♞",
-    (chess.PAWN,   chess.BLACK): "♟",
-}
+# ── SVG chess-piece icons ─────────────────────────────────────────────────────
 
 # ── Stockfish helper ───────────────────────────────────────────────────────────
 _SF_CANDIDATES = [
@@ -84,12 +71,8 @@ _CSS = """
   background:transparent;border:5px solid rgba(0,0,0,.22);
   border-radius:50%;pointer-events:none;z-index:2}
 .last{background:#cdd26a!important}
-.wp{font-size:50px;line-height:1;color:#fff;
-  -webkit-text-stroke:1.8px #111;
-  text-shadow:0 2px 2px rgba(0,0,0,.75),0 0 5px rgba(0,0,0,.65)}
-.bp{font-size:50px;line-height:1;color:#080808;
-  -webkit-text-stroke:1.5px #fff;
-  text-shadow:0 2px 2px rgba(255,255,255,.55),0 0 5px rgba(255,255,255,.45)}
+.wp,.bp{width:54px;height:54px;display:flex;align-items:center;justify-content:center}
+.wp svg,.bp svg{width:100%;height:100%;display:block;filter:drop-shadow(0 2px 1px rgba(0,0,0,.3))}
 </style>
 """
 
@@ -158,9 +141,8 @@ def _make_board_html(
 
             inner = ""
             if piece:
-                sym = PIECES.get((piece.piece_type, piece.color), "?")
                 pc = "wp" if piece.color == chess.WHITE else "bp"
-                inner = f'<span class="{pc}">{sym}</span>'
+                inner = f'<span class="{pc}">{piece_svg(piece.piece_type, piece.color == chess.WHITE)}</span>'
 
             cells.append(
                 f'<div class="{" ".join(cls)}" onclick="sqClick({sq})">{inner}</div>'
@@ -379,18 +361,18 @@ def undo_move(state: dict):
 # ── Main-board editor ──────────────────────────────────────────────────────────
 PIECE_CHOICES = {
     "Trống": None,
-    "Trắng ♔ Vua": chess.Piece(chess.KING, chess.WHITE),
-    "Trắng ♕ Hậu": chess.Piece(chess.QUEEN, chess.WHITE),
-    "Trắng ♖ Xe": chess.Piece(chess.ROOK, chess.WHITE),
-    "Trắng ♗ Tượng": chess.Piece(chess.BISHOP, chess.WHITE),
-    "Trắng ♘ Mã": chess.Piece(chess.KNIGHT, chess.WHITE),
-    "Trắng ♙ Tốt": chess.Piece(chess.PAWN, chess.WHITE),
-    "Đen ♚ Vua": chess.Piece(chess.KING, chess.BLACK),
-    "Đen ♛ Hậu": chess.Piece(chess.QUEEN, chess.BLACK),
-    "Đen ♜ Xe": chess.Piece(chess.ROOK, chess.BLACK),
-    "Đen ♝ Tượng": chess.Piece(chess.BISHOP, chess.BLACK),
-    "Đen ♞ Mã": chess.Piece(chess.KNIGHT, chess.BLACK),
-    "Đen ♟ Tốt": chess.Piece(chess.PAWN, chess.BLACK),
+    "Trắng - Vua": chess.Piece(chess.KING, chess.WHITE),
+    "Trắng - Hậu": chess.Piece(chess.QUEEN, chess.WHITE),
+    "Trắng - Xe": chess.Piece(chess.ROOK, chess.WHITE),
+    "Trắng - Tượng": chess.Piece(chess.BISHOP, chess.WHITE),
+    "Trắng - Mã": chess.Piece(chess.KNIGHT, chess.WHITE),
+    "Trắng - Tốt": chess.Piece(chess.PAWN, chess.WHITE),
+    "Đen - Vua": chess.Piece(chess.KING, chess.BLACK),
+    "Đen - Hậu": chess.Piece(chess.QUEEN, chess.BLACK),
+    "Đen - Xe": chess.Piece(chess.ROOK, chess.BLACK),
+    "Đen - Tượng": chess.Piece(chess.BISHOP, chess.BLACK),
+    "Đen - Mã": chess.Piece(chess.KNIGHT, chess.BLACK),
+    "Đen - Tốt": chess.Piece(chess.PAWN, chess.BLACK),
 }
 
 
@@ -572,8 +554,8 @@ with gr.Blocks(title="Cờ Vua vs Stockfish", theme=gr.themes.Soft()) as demo:
 
     with gr.Row():
         color_radio = gr.Radio(
-            choices=["Trắng ♔", "Đen ♚"],
-            value="Trắng ♔",
+            choices=["Trắng", "Đen"],
+            value="Trắng",
             label="Màu quân của bạn",
             scale=2,
         )
@@ -601,7 +583,7 @@ with gr.Blocks(title="Cờ Vua vs Stockfish", theme=gr.themes.Soft()) as demo:
         with gr.Row():
             editor_piece = gr.Dropdown(
                 choices=list(PIECE_CHOICES.keys()),
-                value="Trắng ♙ Tốt",
+                value="Trắng - Tốt",
                 label="Quân muốn đặt / thay",
                 scale=2,
             )
