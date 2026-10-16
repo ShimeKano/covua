@@ -9,23 +9,24 @@ import chess
 import chess.engine
 import gradio as gr
 
-# ── OpenGameArt pixel-art board and piece assets ──────────────────────────────
-# Assets are stored in this repository under /ass and loaded from its public raw URLs.
-_ASSET_BASE = "https://raw.githubusercontent.com/ShimeKano/covua/main/ass"
+# ── Chess.com Neo piece assets ────────────────────────────────────────────────
+# The 12 transparent PNG pieces are stored in this repository under /assneo.
+# Filenames use Chess.com piece codes: w/b = white/black, k/q/r/b/n/p = piece.
+_ASSET_BASE = "https://raw.githubusercontent.com/ShimeKano/covua/main/assneo"
 
 _PIECE_ASSETS = {
-    (chess.KING, chess.WHITE): "staunton_white_king_64-removebg-preview.png",
-    (chess.QUEEN, chess.WHITE): "staunton_white_queen_64-removebg-preview.png",
-    (chess.ROOK, chess.WHITE): "staunton_white_rook_64-removebg-preview.png",
-    (chess.BISHOP, chess.WHITE): "staunton_white_bishop_64-removebg-preview.png",
-    (chess.KNIGHT, chess.WHITE): "staunton_white_knight_64-removebg-preview.png",
-    (chess.PAWN, chess.WHITE): "staunton_white_pawn_64-removebg-preview.png",
-    (chess.KING, chess.BLACK): "staunton_black_king_64-removebg-preview.png",
-    (chess.QUEEN, chess.BLACK): "staunton_black_queen_64-removebg-preview.png",
-    (chess.ROOK, chess.BLACK): "staunton_black_rook_64-removebg-preview.png",
-    (chess.BISHOP, chess.BLACK): "staunton_black_bishop_64-removebg-preview.png",
-    (chess.KNIGHT, chess.BLACK): "staunton_black_knight_64-removebg-preview.png",
-    (chess.PAWN, chess.BLACK): "staunton_black_pawn_64-removebg-preview.png",
+    (chess.KING, chess.WHITE): "wk.png",
+    (chess.QUEEN, chess.WHITE): "wq.png",
+    (chess.ROOK, chess.WHITE): "wr.png",
+    (chess.BISHOP, chess.WHITE): "wb.png",
+    (chess.KNIGHT, chess.WHITE): "wn.png",
+    (chess.PAWN, chess.WHITE): "wp.png",
+    (chess.KING, chess.BLACK): "bk.png",
+    (chess.QUEEN, chess.BLACK): "bq.png",
+    (chess.ROOK, chess.BLACK): "br.png",
+    (chess.BISHOP, chess.BLACK): "bb.png",
+    (chess.KNIGHT, chess.BLACK): "bn.png",
+    (chess.PAWN, chess.BLACK): "bp.png",
 }
 
 
