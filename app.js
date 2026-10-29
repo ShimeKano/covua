@@ -4,6 +4,8 @@ const ASSET='./assneo/';
 const files={k:'wk.png',q:'wq.png',r:'wr.png',b:'wb.png',n:'wn.png',p:'wp.png',K:'bk.png',Q:'bq.png',R:'br.png',B:'bb.png',N:'bn.png',P:'bp.png'};
 const game=new Chess();
 let flipped=false,selected=null,legal=[],initialMinutes=5,remaining={w:300000,b:300000},active='w',lastMove=null,timer=null,started=false,finished=false,history=[],reviewWorker=null,reviewRunning=false;
+const moveAudio=new Audio('./sounds/move.wav');moveAudio.preload='auto';
+function playMoveSound(){try{moveAudio.currentTime=0;const playback=moveAudio.play();if(playback&&typeof playback.catch==='function')playback.catch(()=>{})}catch(_){}}
 const $=id=>document.getElementById(id);const board=$('board');
 function format(ms){ms=Math.max(0,ms);const sec=Math.ceil(ms/1000);return String(Math.floor(sec/60)).padStart(2,'0')+':'+String(sec%60).padStart(2,'0')}
 function renderClocks(){$('whiteClock').querySelector('strong').textContent=format(remaining.w);$('blackClock').querySelector('strong').textContent=format(remaining.b);$('whiteClock').classList.toggle('active',active==='w'&&started&&!finished);$('blackClock').classList.toggle('active',active==='b'&&started&&!finished);$('whiteStatus').textContent='Trắng'+(active==='w'&&started&&!finished?' · Đang chạy':'');$('blackStatus').textContent='Đen'+(active==='b'&&started&&!finished?' · Đang chạy':'')}
@@ -16,7 +18,7 @@ function renderStatus(){let s;if(finished)s='Ván cờ đã kết thúc';else if
 function stopClock(){if(timer){clearInterval(timer);timer=null}}
 function startClock(){stopClock();if(!started||finished)return;let prev=Date.now();timer=setInterval(()=>{const now=Date.now();remaining[active]-=now-prev;prev=now;if(remaining[active]<=0){remaining[active]=0;finished=true;stopClock();$('status').textContent='Hết giờ — '+(active==='w'?'Đen':'Trắng')+' thắng';render();showReviewButton();if(window.COVUA_ONLINE?.isOnline())window.COVUA_ONLINE.publishPosition()}else renderClocks()},100)}
 function showReviewButton(){const b=$('review');if(b)b.hidden=!(finished&&history.length>0)}
-function afterMove(){started=true;active=game.turn();if(game.game_over()){finished=true;stopClock();showReviewButton()}else startClock();render();if(window.COVUA_ONLINE?.isOnline())window.COVUA_ONLINE.publishPosition()}
+function afterMove(){playMoveSound();started=true;active=game.turn();if(game.game_over()){finished=true;stopClock();showReviewButton()}else startClock();render();if(window.COVUA_ONLINE?.isOnline())window.COVUA_ONLINE.publishPosition()}
 function newGame(){if(!finished)return;if(window.COVUA_ONLINE?.isOnline()){window.COVUA_ONLINE.requestRematch();return}stopClock();if(reviewRunning&&reviewWorker){reviewWorker.terminate();reviewWorker=null;reviewRunning=false}initialMinutes=Number($('clock').value);game.reset();history=[];remaining={w:initialMinutes*60000,b:initialMinutes*60000};active='w';selected=null;legal=[];lastMove=null;started=false;finished=false;$('review').hidden=true;$('review-results').hidden=true;$('status').textContent='Trắng đi trước';render()}
 function undo(){if(!history.length||remaining.w===0||remaining.b===0)return;stopClock();history.pop();const sans=history.map(x=>x.move.san);game.reset();history=[];for(const san of sans){const beforeFen=game.fen(),mover=game.turn(),move=game.move(san);if(move)history.push({move:{...move},beforeFen,afterFen:game.fen(),mover})}remaining={w:initialMinutes*60000,b:initialMinutes*60000};active=game.turn();selected=null;legal=[];lastMove=history.length?history[history.length-1].move:null;started=history.length>0;finished=false;$('review').hidden=true;$('review-results').hidden=true;if(started)startClock();render()}
 function resign(){if(!started||finished)return;if(!confirm((active==='w'?'Trắng':'Đen')+' đầu hàng?'))return;finished=true;stopClock();$('status').textContent=(active==='w'?'Trắng':'Đen')+' đầu hàng — '+(active==='w'?'Đen':'Trắng')+' thắng';showReviewButton();render();if(window.COVUA_ONLINE?.isOnline())window.COVUA_ONLINE.publishPosition()}
@@ -38,7 +40,7 @@ $('new').addEventListener('click',newGame);$('resign').addEventListener('click',
 (function setupOnline(){
   const status=$('online-status'),createBtn=$('create-room'),joinBtn=$('join-room'),codeInput=$('room-code'),roleText=$('online-role');
   const startBtn=$('start-match'),promptBox=$('online-prompt'),offlineBtn=$('play-offline'),modePill=$('mode-pill');
-  let db=null,uid=null,roomCode=null,role='local',appRef=null,roomRef=null,roomListener=null,onlineMode=false,roomState=null,applyingRemote=false,previousMatchStarted=false;
+  let db=null,uid=null,roomCode=null,role='local',appRef=null,roomRef=null,roomListener=null,onlineMode=false,roomState=null,applyingRemote=false,previousMatchStarted=false,hasLoadedPosition=false;
   const setStatus=s=>{if(status)status.textContent=s};
   const code=()=>Math.random().toString(36).slice(2,8).toUpperCase();
   const isOnline=()=>Boolean(onlineMode&&roomCode&&roomRef);
@@ -71,9 +73,13 @@ $('new').addEventListener('click',newGame);$('resign').addEventListener('click',
     if(!data||!data.fen)return;
     applyingRemote=true;
     try{
+      const previousPly=history.length,hadLoaded=hasLoadedPosition;
+      const incomingSans=Array.isArray(data.sans)?data.sans:Object.values(data.sans||{});
       game.reset();history=[];
-      for(const san of (Array.isArray(data.sans)?data.sans:Object.values(data.sans||{}))){const beforeFen=game.fen(),mover=game.turn(),move=game.move(san);if(move)history.push({move:{...move},beforeFen,afterFen:game.fen(),mover})}
+      for(const san of incomingSans){const beforeFen=game.fen(),mover=game.turn(),move=game.move(san);if(move)history.push({move:{...move},beforeFen,afterFen:game.fen(),mover})}
       if(game.fen()!==data.fen)game.load(data.fen);
+      if(hadLoaded&&incomingSans.length>previousPly)playMoveSound();
+      hasLoadedPosition=true;
       started=Boolean(data.started);finished=Boolean(data.finished);active=game.turn();selected=null;legal=[];lastMove=history.length?history[history.length-1].move:null;
       if(finished)stopClock();else if(started)startClock();else stopClock();
       render();showReviewButton();
