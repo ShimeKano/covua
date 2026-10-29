@@ -22,7 +22,16 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: 24
-      - name: Scan required files, HTML references, UI hooks, and chess assets
+      - name: Install pinned Stockfish 19 Lite Single
+        run: |
+          npm install --prefix /tmp/covua-stockfish --no-save --no-audit --no-fund stockfish@19.0.1
+          mkdir -p stockfish
+          cp /tmp/covua-stockfish/node_modules/stockfish/bin/stockfish-19-lite-single.js stockfish/
+          cp /tmp/covua-stockfish/node_modules/stockfish/bin/stockfish-19-lite-single.wasm stockfish/
+          cp /tmp/covua-stockfish/node_modules/stockfish/Copying.txt stockfish/ || true
+          test -s stockfish/stockfish-19-lite-single.js
+          test -s stockfish/stockfish-19-lite-single.wasm
+      - name: Scan required files, HTML references, UI hooks, chess assets, and Stockfish files
         run: node scripts/check-site.mjs
       - name: Check JavaScript syntax
         run: |
@@ -42,15 +51,21 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: 24
+      - name: Install pinned Stockfish 19 Lite Single
+        run: |
+          npm install --prefix /tmp/covua-stockfish --no-save --no-audit --no-fund stockfish@19.0.1
+          mkdir -p stockfish
+          cp /tmp/covua-stockfish/node_modules/stockfish/bin/stockfish-19-lite-single.js stockfish/
+          cp /tmp/covua-stockfish/node_modules/stockfish/bin/stockfish-19-lite-single.wasm stockfish/
+          cp /tmp/covua-stockfish/node_modules/stockfish/Copying.txt stockfish/ || true
+          test -s stockfish/stockfish-19-lite-single.js
+          test -s stockfish/stockfish-19-lite-single.wasm
       - name: Run pre-deploy checks
         run: node scripts/check-site.mjs
-      - name: Download pinned Stockfish browser engine locally
+      - name: Check JavaScript syntax
         run: |
-          mkdir -p stockfish
-          curl --fail --location --retry 2 --retry-all-errors "https://unpkg.com/stockfish@17.1.0/src/stockfish-17.1-lite-single-03e3232.js" --output stockfish/stockfish-17.1-lite-single-03e3232.js || curl --fail --location --retry 2 --retry-all-errors "https://cdn.jsdelivr.net/npm/stockfish@17.1.0/src/stockfish-17.1-lite-single-03e3232.js" --output stockfish/stockfish-17.1-lite-single-03e3232.js
-          curl --fail --location --retry 2 --retry-all-errors "https://unpkg.com/stockfish@17.1.0/src/stockfish-17.1-lite-single-03e3232.wasm" --output stockfish/stockfish-17.1-lite-single-03e3232.wasm || curl --fail --location --retry 2 --retry-all-errors "https://cdn.jsdelivr.net/npm/stockfish@17.1.0/src/stockfish-17.1-lite-single-03e3232.wasm" --output stockfish/stockfish-17.1-lite-single-03e3232.wasm
-          test -s stockfish/stockfish-17.1-lite-single-03e3232.js
-          test -s stockfish/stockfish-17.1-lite-single-03e3232.wasm
+          node --check app.js
+          node --check diagnostics.js
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
       - name: Upload static site artifact
