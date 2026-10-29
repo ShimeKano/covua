@@ -44,6 +44,13 @@ jobs:
           node-version: 24
       - name: Run pre-deploy checks
         run: node scripts/check-site.mjs
+      - name: Download pinned Stockfish browser engine locally
+        run: |
+          mkdir -p stockfish
+          curl --fail --location --retry 3 --retry-all-errors "https://cdn.jsdelivr.net/npm/stockfish@17.1.0/src/stockfish-17.1-lite-single-03e3232.js" --output stockfish/stockfish-17.1-lite-single-03e3232.js
+          curl --fail --location --retry 3 --retry-all-errors "https://cdn.jsdelivr.net/npm/stockfish@17.1.0/src/stockfish-17.1-lite-single-03e3232.wasm" --output stockfish/stockfish-17.1-lite-single-03e3232.wasm
+          test -s stockfish/stockfish-17.1-lite-single-03e3232.js
+          test -s stockfish/stockfish-17.1-lite-single-03e3232.wasm
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
       - name: Upload static site artifact
