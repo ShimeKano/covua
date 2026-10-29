@@ -47,8 +47,8 @@ jobs:
       - name: Download pinned Stockfish browser engine locally
         run: |
           mkdir -p stockfish
-          curl --fail --location --retry 3 --retry-all-errors "https://cdn.jsdelivr.net/npm/stockfish@17.1.0/src/stockfish-17.1-lite-single-03e3232.js" --output stockfish/stockfish-17.1-lite-single-03e3232.js
-          curl --fail --location --retry 3 --retry-all-errors "https://cdn.jsdelivr.net/npm/stockfish@17.1.0/src/stockfish-17.1-lite-single-03e3232.wasm" --output stockfish/stockfish-17.1-lite-single-03e3232.wasm
+          curl --fail --location --retry 2 --retry-all-errors "https://unpkg.com/stockfish@17.1.0/src/stockfish-17.1-lite-single-03e3232.js" --output stockfish/stockfish-17.1-lite-single-03e3232.js || curl --fail --location --retry 2 --retry-all-errors "https://cdn.jsdelivr.net/npm/stockfish@17.1.0/src/stockfish-17.1-lite-single-03e3232.js" --output stockfish/stockfish-17.1-lite-single-03e3232.js
+          curl --fail --location --retry 2 --retry-all-errors "https://unpkg.com/stockfish@17.1.0/src/stockfish-17.1-lite-single-03e3232.wasm" --output stockfish/stockfish-17.1-lite-single-03e3232.wasm || curl --fail --location --retry 2 --retry-all-errors "https://cdn.jsdelivr.net/npm/stockfish@17.1.0/src/stockfish-17.1-lite-single-03e3232.wasm" --output stockfish/stockfish-17.1-lite-single-03e3232.wasm
           test -s stockfish/stockfish-17.1-lite-single-03e3232.js
           test -s stockfish/stockfish-17.1-lite-single-03e3232.wasm
       - name: Configure GitHub Pages
