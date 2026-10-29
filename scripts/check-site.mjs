@@ -19,6 +19,12 @@ if (existsSync('app.js')) {
   if (!assets.length) fail.push('No chess-piece PNG filenames detected in app.js');
   for (const asset of new Set(assets)) if (!existsSync(join('assneo', asset))) fail.push('Missing chess asset: assneo/' + asset);
 }
+if (existsSync('stockfish')) {
+  for (const engine of ['stockfish-19-lite-single.js', 'stockfish-19-lite-single.wasm']) {
+    const path = join('stockfish', engine);
+    if (!existsSync(path) || readFileSync(path).length === 0) fail.push('Missing or empty Stockfish Lite Single engine file: ' + path);
+  }
+}
 if (existsSync('assneo')) {
   const pngs = readdirSync('assneo').filter(x => x.toLowerCase().endsWith('.png'));
   if (pngs.length < 12) fail.push('Expected at least 12 PNG piece assets in assneo/, found ' + pngs.length);
@@ -32,3 +38,4 @@ console.log('COVUA PRE-DEPLOY CHECK PASSED');
 console.log('- Required app files present');
 console.log('- HTML references verified');
 console.log('- Chess UI bindings and assneo PNG assets checked');
+if (existsSync('stockfish')) console.log('- Stockfish 19 Lite Single JS/WASM assets checked');
