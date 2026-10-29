@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#171a21"><title>Cờ Vua — Local Play</title><link rel="stylesheet" href="./style.css"><script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script></head>
+<body><main class="app">
+<header><div><p class="eyebrow">COVUA · LOCAL PLAY</p><h1>Cờ vua <span>2 người</span></h1><p class="sub">Hai người chơi trực tiếp trên cùng một thiết bị.</p></div><button id="flip" class="ghost">⟳ Xoay bàn</button></header>
+<section class="setup panel"><div class="field"><label for="clock">Thời gian mỗi bên</label><select id="clock"><option value="1">1 phút</option><option value="3">3 phút</option><option value="5" selected>5 phút</option><option value="10">10 phút</option><option value="15">15 phút</option></select></div><button id="new" class="primary">Ván mới</button><button id="undo" class="ghost">Đi lại</button><button id="resign" class="danger">Đầu hàng</button></section>
+<div class="layout"><section class="game"><div class="clockbar"><div id="blackClock" class="clock"><small>ĐEN</small><strong>05:00</strong></div><div class="player" id="blackStatus">Đến lượt sau</div></div>
+<div id="board" class="board" aria-label="Bàn cờ"></div>
+<div class="clockbar bottom"><div id="whiteClock" class="clock active"><small>TRẮNG</small><strong>05:00</strong></div><div class="player" id="whiteStatus">Đến lượt đi</div></div></section>
+<aside class="panel side"><div class="statusline"><span class="dot"></span><strong id="status">Trắng đi trước</strong></div><h2>Nước đi</h2><div id="moves" class="moves"><p class="muted">Nước đi sẽ hiện ở đây.</p></div><div class="actions"><button id="copy" class="ghost">Sao chép PGN</button><button id="download" class="ghost">Tải PGN</button></div><p class="note">Không tài khoản, không lưu lịch sử trên máy chủ. Tải PGN nếu muốn giữ lại ván cờ.</p></aside></div>
+<footer>Quân cờ lấy từ <code>assneo/</code> · Luật cờ xử lý bằng chess.js</footer></main><script src="./app.js"></script></body></html>
