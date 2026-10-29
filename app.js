@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const ASSET='https://raw.githubusercontent.com/ShimeKano/covua/main/assneo/';
+const ASSET='./assneo/';
 const files={k:'wk.png',q:'wq.png',r:'wr.png',b:'wb.png',n:'wn.png',p:'wp.png',K:'bk.png',Q:'bq.png',R:'br.png',B:'bb.png',N:'bn.png',P:'bp.png'};
 const game=new Chess();let flipped=false,selected=null,legal=[],history=[],initialMinutes=5,remaining={w:300000,b:300000},active='w',lastMove=null,timer=null,started=false,finished=false;
 const $=id=>document.getElementById(id);const board=$('board');
