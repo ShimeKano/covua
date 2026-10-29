@@ -93,13 +93,22 @@ $('new').addEventListener('click',newGame);$('undo').addEventListener('click',un
     createBtn.disabled=joinBtn.disabled=true;setStatus('Đang tham gia phòng…');
     try{
       await ready();roomCode=requested;const ref=db.ref('rooms/'+roomCode);const snap=await ref.once('value');if(!snap.exists())throw new Error('Không tìm thấy phòng này');
+      const current= snap.val();
+      if(current.blackUid && current.blackUid!==uid && current.whiteUid!==uid){
+        // Full room: spectators only need read access, so do not attempt a write transaction.
+        watchRoom(ref);return;
+      }
       const result=await ref.transaction(room=>{
         if(room===null)return;
         if(room.whiteUid===uid||room.blackUid===uid)return room;
         if(!room.blackUid){room.blackUid=uid;return room}
-        return room;
+        return; // A concurrent join claimed the seat first; retry as spectator below.
       });
-      if(!result.committed)throw new Error('Không thể vào phòng');
+      if(!result.committed){
+        const latest=await ref.once('value');
+        if(!latest.exists())throw new Error('Phòng không còn tồn tại');
+        if(latest.val().whiteUid!==uid&&latest.val().blackUid!==uid){watchRoom(ref);return}
+      }
       watchRoom(ref);
     }catch(e){roomCode=null;setStatus('Tham gia thất bại: '+e.message+' — nếu là lỗi permission, hãy cập nhật Rules.')}
     finally{createBtn.disabled=joinBtn.disabled=false}
