@@ -33,13 +33,13 @@ startupTimeout=setTimeout(()=>fail('Stockfish không khởi động trong 15 gi�
 }
 function finishReviewError(msg){reviewRunning=false;$('review').disabled=false;$('review').textContent='Phân tích ván cờ';$('review-results').hidden=false;$('review-summary').textContent=msg}
 function renderReview(results){const sides={w:[],b:[]};for(const r of results)sides[r.color==='Trắng'?'w':'b'].push(r.loss);const avg=a=>a.length?a.reduce((s,x)=>s+x,0)/a.length:0;const accuracy=a=>100*Math.exp(-avg(a)/120);$('review-summary').textContent='Độ chính xác ước tính: Trắng '+accuracy(sides.w).toFixed(1)+'% · Đen '+accuracy(sides.b).toFixed(1)+'% · '+results.length+' nước phân tích ở depth 12. Chỉ số dựa trên mức mất điểm engine, không phải điểm chính thức của Chess.com/Lichess.';$('review-list').innerHTML='';for(const r of results){const row=document.createElement('div');row.className='review-row';const move=document.createElement('strong');move.textContent=r.n+'. '+r.color+' '+r.san;const tag=document.createElement('span');tag.className='review-tag '+(r.loss<80?'good':r.loss<180?'warn':'bad');tag.textContent=r.label+' · mất '+Math.round(r.loss)+' cp';row.append(move,tag);if(r.bestMove){const detail=document.createElement('small');detail.textContent='Nước engine đề xuất (UCI): '+r.bestMove;row.append(detail)}$('review-list').append(row)}}
-$('new').addEventListener('click',newGame);$('undo').addEventListener('click',undo);$('resign').addEventListener('click',resign);$('flip').addEventListener('click',()=>{flipped=!flipped;render()});$('zoom').addEventListener('click',toggleFullscreen);$('clock').addEventListener('change',()=>{if(!started)newGame()});$('review').addEventListener('click',reviewGame);$('copy').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(pgn());$('copy').textContent='Đã sao chép!';setTimeout(()=>$('copy').textContent='Sao chép PGN',1300)}catch{$('status').textContent='Không sao chép được; hãy tải PGN'}});$('download').addEventListener('click',()=>{const blob=new Blob([pgn()],{type:'text/plain;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='covua-game.pgn';a.click();URL.revokeObjectURL(url)});newGame();
+$('new').addEventListener('click',newGame);$('resign').addEventListener('click',resign);$('flip').addEventListener('click',()=>{flipped=!flipped;render()});$('zoom').addEventListener('click',toggleFullscreen);$('clock').addEventListener('change',()=>{if(!started)newGame()});$('review').addEventListener('click',reviewGame);$('copy').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(pgn());$('copy').textContent='Đã sao chép!';setTimeout(()=>$('copy').textContent='Sao chép PGN',1300)}catch{$('status').textContent='Không sao chép được; hãy tải PGN'}});$('download').addEventListener('click',()=>{const blob=new Blob([pgn()],{type:'text/plain;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='covua-game.pgn';a.click();URL.revokeObjectURL(url)});newGame();
 
 /* Online rooms: Firebase Realtime Database + anonymous sign-in. */
 (function setupOnline(){
   const status=$('online-status'),createBtn=$('create-room'),joinBtn=$('join-room'),codeInput=$('room-code'),roleText=$('online-role');
   const startBtn=$('start-match'),promptBox=$('online-prompt'),offlineBtn=$('play-offline'),modePill=$('mode-pill');
-  let db=null,uid=null,roomCode=null,role='local',appRef=null,roomRef=null,roomListener=null,onlineMode=false,roomState=null,applyingRemote=false;
+  let db=null,uid=null,roomCode=null,role='local',appRef=null,roomRef=null,roomListener=null,onlineMode=false,roomState=null,applyingRemote=false,previousMatchStarted=false;
   const setStatus=s=>{if(status)status.textContent=s};
   const code=()=>Math.random().toString(36).slice(2,8).toUpperCase();
   const isOnline=()=>Boolean(onlineMode&&roomCode&&roomRef);
@@ -110,7 +110,9 @@ $('new').addEventListener('click',newGame);$('undo').addEventListener('click',un
     if(roomRef&&roomListener)roomRef.off('value',roomListener);
     roomRef=ref;roomListener=snap=>{
       const room=snap.val();if(!room){setStatus('Phòng không còn tồn tại.');return}
+      const justStarted=Boolean(room.matchStarted)&&!previousMatchStarted;previousMatchStarted=Boolean(room.matchStarted);
       roomState=room;
+      if(justStarted){initialMinutes=Number($('clock').value)||5;remaining={w:initialMinutes*60000,b:initialMinutes*60000};started=false;finished=false;active='w';stopClock();}
       window.__covuaWhiteUid=room.whiteUid||'';window.__covuaBlackUid=room.blackUid||'';
       if(uid===room.whiteUid||uid===room.blackUid){
         if(room.matchStarted&&room.colorMap)role=colorForUid(uid)==='w'?'white':colorForUid(uid)==='b'?'black':'spectator';
@@ -192,6 +194,7 @@ $('new').addEventListener('click',newGame);$('undo').addEventListener('click',un
   async function declineStart(){try{await roomRef.update({startRequest:null});setStatus('Bạn đã từ chối lời mời.')}catch(e){setStatus('Không thể từ chối: '+e.message)}}
   async function requestUndo(){
     if(!isOnline()){undo();return}
+    if(role==='spectator'){setStatus('Khán giả không thể yêu cầu đi lại.');return}
     if(!roomState?.matchStarted||finished||history.length===0){setStatus('Chưa có nước đi để yêu cầu hoàn tác.');return}
     if(roomState.undoRequest){setStatus('Đang có một yêu cầu đi lại chờ xử lý.');return}
     try{await roomRef.update({undoRequest:{uid,at:Date.now(),sans:history.slice(0,-1).map(x=>x.move.san)}});setStatus('Đã gửi yêu cầu đi lại.')}
